@@ -1,0 +1,15 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <limits.h>
+
+int main(int argc, char **argv) {
+    char *cwd[PATH_MAX + 1];
+
+    // Main loop of minishell
+    while (1) {
+        
+    }
+
+    return EXIT_SUCCESS;
+}
