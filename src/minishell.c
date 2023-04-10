@@ -17,14 +17,19 @@ void cd(char *cmd, char *cwd) {
     if (new_path[0] == '\0' || new_path[0] == '\n') { // Case: go to home dir
         struct passwd *user;
         if ((user = getpwuid(getuid())) == NULL) {
-            fprintf(stderr, "\nError: Could not get the current user's information. %s.\n", strerror(errno));
+            fprintf(stderr, "\nError: Cannot get passwd entry. %s.\n", strerror(errno));
         } else {
             chdir(user->pw_dir);
         }
     } else { // Case: go to new_path (abs and relative)
         new_path[strlen(new_path) - 1] = '\0';
+        for (int i = 0; i < strlen(new_path); i++) {
+            if (new_path[i] == ' ') {
+                fprintf(stderr, "\nError: Too many arguments to cd.\n");
+            }
+        }
         if (chdir(new_path) != 0) {
-            fprintf(stderr, "\nError: Could not change directory. %s.\n", strerror(errno));
+            fprintf(stderr, "\nError: Cannot change directory to '%s'. %s.\n", new_path, strerror(errno));
         }
     }
 }
@@ -42,7 +47,9 @@ void execute(char *cmd, char *cwd) {
         int argc = 0;
 
         while (tmp != NULL) {
-            tokens[argc] = (char *) malloc(strlen(tmp) + 1);
+            if ((tokens[argc] = (char *) malloc(strlen(tmp) + 1)) == NULL) {
+                fprintf(stderr, "Error: malloc() failed. %s.\n", strerror(errno));
+            }
             strcpy(tokens[argc], tmp);
             argc++;
             tmp = strtok(NULL, " ");
@@ -53,7 +60,7 @@ void execute(char *cmd, char *cwd) {
         pid_t pid;
 
         if ((pid = fork()) < 0) {
-            fprintf(stderr, "Error: fork failed. %s.\n", strerror(errno));
+            fprintf(stderr, "Error: fork() failed. %s.\n", strerror(errno));
             return;
         } else if (pid == 0) { // Child
             execvp(tokens[0], tokens);
@@ -61,7 +68,9 @@ void execute(char *cmd, char *cwd) {
             exit(EXIT_FAILURE);
         }
 
-        waitpid(pid, NULL, 0);
+        if (waitpid(pid, NULL, 0) == -1) {
+            fprintf(stderr, "Error: wait() failed. %s.\n", strerror(errno));            
+        }
 
         // Free all malloced tokens
         for (int i = 0; i < argc; i++) free(tokens[i]);
@@ -94,14 +103,16 @@ int main(int argc, char **argv) {
     // Main loop of minishell
     while (1) {
         if (getcwd(cwd, sizeof(cwd)) == NULL) {
-            fprintf(stderr, "Error: Could not get current directory. %s\n",
+            fprintf(stderr, "Error: Cannot get current working directory. %s.\n",
             strerror(errno));
             exit(EXIT_FAILURE);
         }
 
         // printing current working directory and wait for user input
         printf("\n[%s%s%s]$ ", BRIGHTBLUE, cwd, DEFAULT);
-        fgets(command, sizeof(command), stdin);
+        if (fgets(command, sizeof(command), stdin)) {
+            fprintf(stderr, "Error: Failed to read from stdin. %s.\n", strerror(errno));
+        }
 
         if (!interrupted) execute(command, cwd);
 
