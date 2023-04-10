@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <string.h>
 #include <pwd.h>
+#include <signal.h>
 
 #define BRIGHTBLUE "\x1b[34;1m"
 #define DEFAULT    "\x1b[0m"
@@ -48,14 +49,7 @@ void execute(char *cmd, char *cwd) {
         }
 
         tokens[argc] = NULL;
-
-        // char **test = tokens;
-
-        // while (*test != NULL) {
-        //     printf("%s ", *test);
-        //     test++;
-        // }
-       
+      
         pid_t pid;
 
         if ((pid = fork()) < 0) {
@@ -74,14 +68,34 @@ void execute(char *cmd, char *cwd) {
     }
 }
 
+volatile sig_atomic_t interrupted = 0;
+
+static void handler(int sig, siginfo_t *siginfo, void *context) {
+    interrupted = 1;
+}
+
 int main(int argc, char **argv) {
+    struct sigaction act;
+
+    memset(&act, '\0', sizeof(act));
+    act.sa_sigaction = handler;
+
+    // act.sa_flags = SA_RESTART;
+
+    if (sigaction(SIGINT, &act, NULL) == -1) {
+        // Handle sigaction error
+        fprintf(stderr, "Error: Cannot register signal handler. %s.\n", strerror(errno));
+        return EXIT_FAILURE;
+    }
+
     char cwd[PATH_MAX + 1];
     char command[4096 + 1];
 
     // Main loop of minishell
     while (1) {
         if (getcwd(cwd, sizeof(cwd)) == NULL) {
-            fprintf(stderr, "Error: Could not get current directory. %s\n", strerror(errno));
+            fprintf(stderr, "Error: Could not get current directory. %s\n",
+            strerror(errno));
             exit(EXIT_FAILURE);
         }
 
@@ -89,7 +103,9 @@ int main(int argc, char **argv) {
         printf("\n[%s%s%s]$ ", BRIGHTBLUE, cwd, DEFAULT);
         fgets(command, sizeof(command), stdin);
 
-        execute(command, cwd);
+        if (!interrupted) execute(command, cwd);
+
+        interrupted = 0;
     }
 
     return EXIT_SUCCESS;
