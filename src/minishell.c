@@ -11,6 +11,12 @@
 #define BRIGHTBLUE "\x1b[34;1m"
 #define DEFAULT    "\x1b[0m"
 
+/*
+    cd - change directory
+
+    cmd: full command passed to shell string
+    cwd: current working directory string
+*/
 void cd(char *cmd, char *cwd) {
     char *new_path = cmd + 3;
 
@@ -34,6 +40,12 @@ void cd(char *cmd, char *cwd) {
     }
 }
 
+/*
+    execute - executes a function in a child process
+
+    cmd: full command passed to shell string
+    cwd: current working directory string
+*/
 void execute(char *cmd, char *cwd) {
     if (cmd[0] == 'c' && cmd[1] == 'd' && (cmd[2] == ' ' || cmd[2] == '\n')) { // Case 1: cd
         cd(cmd, cwd);
@@ -77,12 +89,19 @@ void execute(char *cmd, char *cwd) {
     }
 }
 
+
 volatile sig_atomic_t interrupted = 0;
 
+/*
+    handler - handles interrupt signal in shell
+*/
 static void handler(int sig, siginfo_t *siginfo, void *context) {
     interrupted = 1;
 }
 
+/*
+    main - does stuff
+*/
 int main(int argc, char **argv) {
     struct sigaction act;
 
@@ -114,6 +133,7 @@ int main(int argc, char **argv) {
             fprintf(stderr, "Error: Failed to read from stdin. %s.\n", strerror(errno));
         }
 
+        // Skip interrupted cycle
         if (!interrupted) execute(command, cwd);
 
         interrupted = 0;
