@@ -127,16 +127,26 @@ int main(int argc, char **argv) {
             exit(EXIT_FAILURE);
         }
 
+        interrupted = 0;
+
         // printing current working directory and wait for user input
         printf("\n[%s%s%s]$ ", BRIGHTBLUE, cwd, DEFAULT);
         if (fgets(command, sizeof(command), stdin)) {
-            fprintf(stderr, "Error: Failed to read from stdin. %s.\n", strerror(errno));
+            if (errno == EINTR) {
+                printf("Read interrupted.\n");
+                errno = 0;
+                continue;
+            } else if (feof(stdin)) {
+                printf("\n");
+                return EXIT_SUCCESS;
+            } else if (ferror(stdin)) {
+                fprintf(stderr, "Error: Failed to read from stdin. %s.\n", strerror(errno));
+                return EXIT_FAILURE;
+            }
         }
 
         // Skip interrupted cycle
         if (!interrupted) execute(command, cwd);
-
-        interrupted = 0;
     }
 
     return EXIT_SUCCESS;
