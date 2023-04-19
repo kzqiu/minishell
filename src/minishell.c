@@ -53,6 +53,7 @@ void execute(char *cmd, char *cwd) {
         printf("\n");
         exit(0);
     } else { // Case 3: Non-shell builtins        
+        printf("\n");
         cmd[strlen(cmd) - 1] = '\0';
         char *tokens[2048];
         char *tmp = strtok(cmd, " ");
@@ -80,7 +81,7 @@ void execute(char *cmd, char *cwd) {
             exit(EXIT_FAILURE);
         }
 
-        if (waitpid(pid, NULL, 0) == -1) {
+        if (waitpid(pid, NULL, 0) == -1 && errno != EINTR) {
             fprintf(stderr, "Error: wait() failed. %s.\n", strerror(errno));            
         }
 
@@ -121,32 +122,31 @@ int main(int argc, char **argv) {
 
     // Main loop of minishell
     while (1) {
-        if (getcwd(cwd, sizeof(cwd)) == NULL) {
-            fprintf(stderr, "Error: Cannot get current working directory. %s.\n",
-            strerror(errno));
-            exit(EXIT_FAILURE);
-        }
+        if (interrupted) {
+            interrupted = 0;
+        } else {
+            if (getcwd(cwd, sizeof(cwd)) == NULL) {
+                fprintf(stderr, "Error: Cannot get current working directory. %s.\n", strerror(errno));
+                exit(EXIT_FAILURE);
+            }
 
-        interrupted = 0;
-
-        // printing current working directory and wait for user input
-        printf("\n[%s%s%s]$ ", BRIGHTBLUE, cwd, DEFAULT);
-        if (fgets(command, sizeof(command), stdin)) {
-            if (errno == EINTR) {
-                printf("Read interrupted.\n");
-                errno = 0;
-                continue;
-            } else if (feof(stdin)) {
-                printf("\n");
-                return EXIT_SUCCESS;
-            } else if (ferror(stdin)) {
-                fprintf(stderr, "Error: Failed to read from stdin. %s.\n", strerror(errno));
-                return EXIT_FAILURE;
+            // printing current working directory and wait for user input
+            printf("\n[%s%s%s]$ ", BRIGHTBLUE, cwd, DEFAULT);
+            if (fgets(command, sizeof(command), stdin) != NULL) {
+                execute(command, cwd);
+            } else {
+                if (errno == EINTR) {
+                    printf("\n");
+                    errno = 0;
+                } else if (feof(stdin)) {
+                    printf("\n");
+                    return EXIT_SUCCESS;
+                } else if (ferror(stdin)) {
+                    fprintf(stderr, "Error: Failed to read from stdin. %s.\n", strerror(errno));
+                    return EXIT_FAILURE;
+                }
             }
         }
-
-        // Skip interrupted cycle
-        if (!interrupted) execute(command, cwd);
     }
 
     return EXIT_SUCCESS;
